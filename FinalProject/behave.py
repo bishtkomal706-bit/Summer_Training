@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from tensorflow import keras
 from streamlit_option_menu import option_menu
 import time
+import os
 
 st.set_page_config(page_title="Customer Behaviour & Demand Prediction System",
                     page_icon="📊", layout="wide", initial_sidebar_state="expanded")
@@ -208,25 +209,28 @@ def kpi_card(label, value, accent_class=""):
 
 
 # ------------------------------------------------------------------
-# LOAD SAVED MODELS / DATA
+# LOAD SAVED MODELS / DATA (FIXED PATH ERRORS)
 # ------------------------------------------------------------------
 @st.cache_resource
 def load_all():
     objs = {}
-    objs['churn_model'] = joblib.load('best_churn_model.pkl')
-    objs['scaler_churn'] = joblib.load('scaler_churn.pkl')
-    objs['clv_model'] = joblib.load('best_clv_model.pkl')
-    objs['scaler_clv'] = joblib.load('scaler_clv.pkl')
-    objs['demand_model'] = joblib.load('best_demand_model.pkl')
-    objs['scaler_demand'] = joblib.load('scaler_demand.pkl')
-    objs['le_stock'] = joblib.load('le_stock.pkl')
-    objs['kmeans'] = joblib.load('kmeans_model.pkl')
-    objs['scaler_seg'] = joblib.load('scaler_seg.pkl')
-    objs['segment_names'] = joblib.load('segment_names.pkl')
-    objs['cnn_model'] = keras.models.load_model('cnn_model.keras')
-    objs['churn_results'] = pd.read_csv('churn_results.csv')
-    objs['clv_results'] = pd.read_csv('clv_results.csv')
-    objs['demand_results'] = pd.read_csv('demand_results.csv')
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Dynamic paths using os.path.join to prevent FileNotFoundError on cloud deployments
+    objs['churn_model'] = joblib.load(os.path.join(current_dir, 'best_churn_model.pkl'))
+    objs['scaler_churn'] = joblib.load(os.path.join(current_dir, 'scaler_churn.pkl'))
+    objs['clv_model'] = joblib.load(os.path.join(current_dir, 'best_clv_model.pkl'))
+    objs['scaler_clv'] = joblib.load(os.path.join(current_dir, 'scaler_clv.pkl'))
+    objs['demand_model'] = joblib.load(os.path.join(current_dir, 'best_demand_model.pkl'))
+    objs['scaler_demand'] = joblib.load(os.path.join(current_dir, 'scaler_demand.pkl'))
+    objs['le_stock'] = joblib.load(os.path.join(current_dir, 'le_stock.pkl'))
+    objs['kmeans'] = joblib.load(os.path.join(current_dir, 'kmeans_model.pkl'))
+    objs['scaler_seg'] = joblib.load(os.path.join(current_dir, 'scaler_seg.pkl'))
+    objs['segment_names'] = joblib.load(os.path.join(current_dir, 'segment_names.pkl'))
+    objs['cnn_model'] = keras.models.load_model(os.path.join(current_dir, 'cnn_model.keras'))
+    objs['churn_results'] = pd.read_csv(os.path.join(current_dir, 'churn_results.csv'))
+    objs['clv_results'] = pd.read_csv(os.path.join(current_dir, 'clv_results.csv'))
+    objs['demand_results'] = pd.read_csv(os.path.join(current_dir, 'demand_results.csv'))
     return objs
 
 try:
@@ -289,18 +293,21 @@ with st.sidebar:
     st.markdown("### 📂 Browse Data")
     
     uploaded_data_file = st.file_uploader("Upload tracking data (CSV)", type=["csv"], key="dynamic_data_loader")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
 
     if uploaded_data_file is not None:
         raw_uploaded_df = pd.read_csv(uploaded_data_file)
         if 'Recency' in raw_uploaded_df.columns or 'Frequency' in raw_uploaded_df.columns or 'Monetary' in raw_uploaded_df.columns:
             data['rfm'] = raw_uploaded_df
-            data['daily_demand'] = pd.read_csv('daily_demand_final.csv')
+            data['daily_demand'] = pd.read_csv(os.path.join(current_dir, 'daily_demand_final.csv'))
         else:
             data['daily_demand'] = raw_uploaded_df
-            data['rfm'] = pd.read_csv('rfm_final.csv')
+            data['rfm'] = pd.read_csv(os.path.join(current_dir, 'rfm_final.csv'))
     else:
-        data['rfm'] = pd.read_csv('rfm_final.csv')
-        data['daily_demand'] = pd.read_csv('daily_demand_final.csv')
+        # FIXED: Changed the github URL structure to use the direct RAW link to prevent HTML parse errors
+        csv_url = "https://raw.githubusercontent.com/bishtkomal706-bit/Summer_Training/main/FinalProject/rfm_final.csv"
+        data['rfm'] = pd.read_csv(csv_url)
+        data['daily_demand'] = pd.read_csv(os.path.join(current_dir, 'daily_demand_final.csv'))
 
     st.markdown("<div style='margin-top:18px;'></div>", unsafe_allow_html=True)
     st.markdown("""
@@ -565,7 +572,7 @@ elif page == "Model Comparison":
         cr = data['churn_results'].sort_values('F1-Score', ascending=False)
         st.dataframe(cr, use_container_width=True)
         fig = px.bar(cr, x='Model', y=['Accuracy', 'Precision', 'Recall', 'F1-Score'],
-                     barmode='group', title="Churn Model Comparison")
+                      barmode='group', title="Churn Model Comparison")
         st.plotly_chart(style_fig(fig), use_container_width=True)
         best = cr.iloc[0]['Model']
         
@@ -683,7 +690,7 @@ elif page == "Smart Predictor":
             week_of_year = min(int(month * 4.33), 52)
 
             demand_input = data['scaler_demand'].transform([[stock_enc, price, month, day_of_week_num,
-                                                                week_of_year, lag1, rolling7]])
+                                                            week_of_year, lag1, rolling7]])
             demand_pred = max(0, data['demand_model'].predict(demand_input)[0])
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
